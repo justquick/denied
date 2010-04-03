@@ -21,10 +21,14 @@ def add_note(title, text):
     finally:
         f.close()
 
+context_processors(
+    lambda request: {'notes': get_all_notes()},
+)
+
 
 @route('/')
 def show_notes():
-    return render_template(notes=get_all_notes())
+    return render_template()
 
 
 @route('/create')

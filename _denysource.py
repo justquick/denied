@@ -25,6 +25,7 @@ class Denied(object):
                 _os.path.join(self.get_application_path(), 'templates'))
         )
         self._jinja_env.globals['url_for'] = self.url_for
+        self._template_context_processors = ()
 
     def get_application_path(self):
         if self._application_path is None:
@@ -80,10 +81,16 @@ class Denied(object):
             raise DeniedException('could not figure out template name')
         return self.make_endpoint(obj) + '.html'
 
+    def _set_template_context_processors(self, *processors):
+        self._template_context_processors += processors
+
     def render_template(self, template_name_or_source=None, **context):
         if template_name_or_source is None:
             template_name_or_source = self._guess_template(_sys._getframe(1))
         self.populate_context(context)
+        if self._template_context_processors:
+            for processor in self._template_context_processors:
+                context.update(processor(self.request))
         if self.looks_like_template_source(template_name_or_source):
             tmpl = self._jinja_env.from_string(template_name_or_source)
         else:
@@ -100,7 +107,7 @@ class Denied(object):
         return rv
 
     def process_request(self, request):
-        return None
+        return
 
     def process_response(self, request, response):
         return response
@@ -144,6 +151,8 @@ render_template = default_app.render_template
 run = default_app.run
 request = default_app._local('request')
 
+template_context = default_app._jinja_env.globals
+context_processors = default_app._set_template_context_processors
 
 def wsgi_app(environ, start_response):
     return default_app(environ, start_response)
