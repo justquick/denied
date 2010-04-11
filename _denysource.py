@@ -141,7 +141,29 @@ class Denied(object):
         return 'a denied application'
 
     def run(self, hostname='localhost', port=5000, **options):
-        return run_simple(hostname, port, self, **options)
+        def _banner(s):
+            print 'Serving at %s:%d with %s' % (hostname,port,s)
+        try:
+            # Gevent
+            from gevent.wsgi import WSGIServers
+            http_server = WSGIServer((hostname, port), self)
+            _banner('Gevent')
+            http_server.serve_forever()
+        except ImportError:
+            try:
+                # Tornado
+                from tornado.httpserver import HTTPServer
+                from tornado.wsgi import WSGIContainers
+                from tornado.ioloop import IOLoop
+                container = WSGIContainer(self)
+                http_server = HTTPServer(container)
+                http_server.listen(port, hostname)
+                _banner('Tornado')
+                IOLoop.instance().start()
+            except ImportError:
+                # Werkzeug
+                _banner('Werkzeug')
+                run_simple(hostname, port, self, **options)
 
 
 default_app = Denied()
@@ -150,7 +172,6 @@ url_for = default_app.url_for
 render_template = default_app.render_template
 run = default_app.run
 request = default_app._local('request')
-
 template_context = default_app._jinja_env.globals
 context_processors = default_app._set_template_context_processors
 
@@ -158,13 +179,13 @@ def wsgi_app(environ, start_response):
     return default_app(environ, start_response)
 
 
-def _deny_internals():
-    for key, value in globals().items():
-        if hasattr(value, '__module__') and \
-           value.__module__.startswith(('jinja2.', 'werkzeug.',
-                                        '_denysource.')):
-            try:
-                value.__module__ = 'deny'
-            except:
-                pass
-_deny_internals()
+#def _deny_internals():
+#    for key, value in globals().items():
+#        if hasattr(value, '__module__') and \
+#           value.__module__.startswith(('jinja2.', 'werkzeug.',
+#                                        '_denysource.')):
+#            try:
+#                value.__module__ = 'deny'
+#            except:
+#                pass
+#_deny_internals()
